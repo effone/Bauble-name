@@ -1,13 +1,14 @@
 <?php
 
 /**
- * MyLast : A Plugin for MyBB to jump to the last post of the user in a thread.
+ * Bauble Name : Decorate your usernames with group color / avatar throughout your MyBB board.
  *
  * @package MyBB Plugin
  * @author effone <effone@mybb.com>
  * @copyright 2018 MyBB Group <http://mybb.group>
  * @version 1.0.0
  * @license GPL-3.0
+ * @todo Preserve invisible asterisk in format_user function
  *
  */
 
@@ -25,7 +26,7 @@ function baublename_info()
         'author' => 'effone',
         'authorsite' => 'https://eff.one',
         'version' => '1.0.0',
-        'compatibility' => '18*',
+        'compatibility' => '18*'
     );
 }
 
@@ -119,7 +120,7 @@ function index_polish()
     }, $boardstats);
 }
 
-function format_user($data, $name = 0, $avatar = '') // PRESERVE END ASTERISK
+function format_user($data, $name = 0, $avatar = '')
 {
     if (empty($data)) {
         return;
