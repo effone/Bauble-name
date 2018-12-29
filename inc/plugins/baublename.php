@@ -1,16 +1,17 @@
 <?php
 
 /**
- * Bauble Name
- * 
+ * MyLast : A Plugin for MyBB to jump to the last post of the user in a thread.
+ *
  * @package MyBB Plugin
  * @author effone <effone@mybb.com>
  * @copyright 2018 MyBB Group <http://mybb.group>
  * @version 1.0.0
  * @license GPL-3.0
- * 
+ *
  */
 
+// Disallow direct access to this file for security reasons
 if (!defined("IN_MYBB")) {
     die("Direct initialization of this file is not allowed.");
 }
@@ -37,8 +38,9 @@ function baublename_activate()
     require_once MYBB_ROOT . "/inc/adminfunctions_templates.php";
     find_replace_templatesets('header_welcomeblock_member', '#{\$lang->welcome_back}#', '<!-- start: header_welcome_back -->{\$lang->welcome_back}<!-- end: header_welcome_back -->');
     find_replace_templatesets('index_stats', '#{\$lang->stats_newestuser}#', '<!-- start: index_newestuser -->{\$lang->stats_newestuser}<!-- end: index_newestuser -->');
+    find_replace_templatesets('index_whosonline_memberbit', '#'.preg_quote('{$user[\'profilelink\']}') .'#', '<!-- start: index_onlineuser -->{$user[\'profilelink\']}<!-- end: index_onlineuser -->');
 
-    $style = '.inline_avatar{height:16px; width:16px; display: inline-block; margin-right: 2px; margin-bottom: -2px; border-radius: 50%;}';
+    $style = '.inline_avatar{height:16px; width:16px; display: inline-block; margin-right: 5px; margin-bottom: -2px; border-radius: 50%;}';
     $stylesheet = array(
         "name" => "avatar.css",
         "tid" => 1,
@@ -59,7 +61,7 @@ function baublename_deactivate()
 {
     global $db;
     require_once MYBB_ROOT . "/inc/adminfunctions_templates.php";
-    $templates = array('header_welcomeblock_member', 'index_stats');
+    $templates = array('header_welcomeblock_member', 'index_stats', 'index_whosonline_memberbit');
     foreach ($templates as $template) {
         find_replace_templatesets($template, '#<!--(.*?)-->#', '');
     }
@@ -82,12 +84,42 @@ function welcome_polish()
 
 function index_polish()
 {
-    global $lang, $stats, $boardstats;
+    global $lang, $cache, $mybb, $stats, $boardstats, $onlinebots;
     $lang->stats_newestuser = preg_replace('#(<a)[\s\S]+(<\/a>)#', format_user($stats['lastusername'], 1, 'inline_avatar'), $lang->stats_newestuser);
     $boardstats = preg_replace('#(<!-- start: index_newestuser)[\s\S]+(end: index_newestuser -->)#', $lang->stats_newestuser, $boardstats);
+
+    // Set online bot avatars
+    if(!empty($onlinebots))
+    {
+        $spavpath = $mybb->settings['avataruploadpath'];
+        if(my_substr($spavpath, 0, 1) == '.')
+        {
+            $spavpath = substr($spavpath, 2);
+        }
+        $spavpath .= "/spiders/";
+
+        $spiders = $cache->read('spiders');
+        foreach ($onlinebots as $name => $formatted_name) {
+            $bot_avatar = glob(MYBB_ROOT.$spavpath.get_sid($spiders, $name).'.*');
+            $bot_avatar = empty($bot_avatar) ? $mybb->settings['bburl'].'/'.$spavpath.'0.png' : str_replace(MYBB_ROOT, $mybb->settings['bburl'].'/', $bot_avatar[0]);
+            $bot_avatar = '<img class="inline_avatar" src="' . $bot_avatar . '" />';
+            $boardstats = str_replace($formatted_name, $bot_avatar.$formatted_name, $boardstats);
+        }
+    }
+    
+    // Set online user avatars
+    $replace = [];
+    preg_match_all('/<!--\ss.+?onlineuser\s-->(.*?)<!--\se.*?onlineuser\s-->/', $boardstats, $matches);
+    for ($i = 0; $i < count($matches[1]); $i++) {
+        $replace[] = format_user(trim(strip_tags($matches[1][$i])), 1, 'inline_avatar');
+    }
+    $boardstats = preg_replace_callback('/<!--\ss.+?onlineuser\s-->(.*?)<!--\se.*?onlineuser\s-->/', function ($match) use (&$replace)
+    {
+        return array_shift($replace);
+    }, $boardstats);
 }
 
-function format_user($data, $name = 0, $avatar = '')
+function format_user($data, $name = 0, $avatar = '') // PRESERVE END ASTERISK
 {
     if (empty($data)) {
         return;
@@ -109,4 +141,16 @@ function format_user($data, $name = 0, $avatar = '')
     $user = build_profile_link(format_name($avatar . htmlspecialchars_uni($user['username']), $user['usergroup'], $user['displaygroup']), $user['uid']);
 
     return $user;
+}
+
+function get_sid(array $spiders, string $name)
+{
+    foreach($spiders as $spider){
+        if($spider['name'] == $name)
+        {
+            return $spider['sid'];
+            break;
+        }
+    }
+    return 0;
 }
