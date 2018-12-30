@@ -17,6 +17,8 @@ This plugin is meant to be used with MyBB 1.8 family and will be maintained / up
 - [ ] Ability to upload / change bot avatars from ACP
 - [x] Add spider / bot avatar in Index statistics - who's online
 - [x] Add member avatar in Index statistics - who's online
+- [ ] Add native Member Online Today List
+- [ ] Add member avatar in Index statistics - Online Today
 - [x] Colorize and add avatar in Index statistics - newest member
 - [ ] Colorize and add avatar in Postbit : posted, modified, quote
 - [ ] ACP settings for every location : colorise and/or avatarise

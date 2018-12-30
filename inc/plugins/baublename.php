@@ -30,9 +30,11 @@ function baublename_info()
     );
 }
 
-$plugins->add_hook('global_end', 'welcome_polish');
-$plugins->add_hook('index_end', 'index_polish');
-
+$plugins->add_hook('global_end', 'welcome_bauble');
+$plugins->add_hook('index_end', 'index_bauble');
+$settings = [
+    'wolbots'=>1
+];
 function baublename_activate()
 {
     global $db;
@@ -41,7 +43,8 @@ function baublename_activate()
     find_replace_templatesets('index_stats', '#{\$lang->stats_newestuser}#', '<!-- start: index_newestuser -->{\$lang->stats_newestuser}<!-- end: index_newestuser -->');
     find_replace_templatesets('index_whosonline_memberbit', '#'.preg_quote('{$user[\'profilelink\']}') .'#', '<!-- start: index_onlineuser -->{$user[\'profilelink\']}<!-- end: index_onlineuser -->');
 
-    $style = '.inline_avatar{height:16px; width:16px; display: inline-block; margin-right: 5px; margin-bottom: -2px; border-radius: 50%;}';
+    $style = '.bauble.inline{display: inline-block;}
+    .bauble.inline img{height:16px; width:16px; display: inline-block; margin-right: 5px; margin-bottom: -2px; border-radius: 50%;}';
     $stylesheet = array(
         "name" => "avatar.css",
         "tid" => 1,
@@ -74,7 +77,7 @@ function baublename_deactivate()
     }
 }
 
-function welcome_polish()
+function welcome_bauble()
 {
     global $lang, $mybb, $header;
     if ((int) $mybb->user['uid']) {
@@ -83,10 +86,10 @@ function welcome_polish()
     }
 }
 
-function index_polish()
+function index_bauble()
 {
     global $lang, $cache, $mybb, $stats, $boardstats, $onlinebots;
-    $lang->stats_newestuser = preg_replace('#(<a)[\s\S]+(<\/a>)#', format_user($stats['lastusername'], 1, 'inline_avatar'), $lang->stats_newestuser);
+    $lang->stats_newestuser = preg_replace('#(<a)[\s\S]+(<\/a>)#', format_user($stats['lastusername'], 1, 'inline'), $lang->stats_newestuser);
     $boardstats = preg_replace('#(<!-- start: index_newestuser)[\s\S]+(end: index_newestuser -->)#', $lang->stats_newestuser, $boardstats);
 
     // Set online bot avatars
@@ -100,11 +103,12 @@ function index_polish()
         $spavpath .= "/spiders/";
 
         $spiders = $cache->read('spiders');
-        foreach ($onlinebots as $name => $formatted_name) {
+        foreach ($onlinebots as $formatted_name) {
+            $name = trim(strip_tags($formatted_name));
             $bot_avatar = glob(MYBB_ROOT.$spavpath.get_sid($spiders, $name).'.*');
             $bot_avatar = empty($bot_avatar) ? $mybb->settings['bburl'].'/'.$spavpath.'0.png' : str_replace(MYBB_ROOT, $mybb->settings['bburl'].'/', $bot_avatar[0]);
             $bot_avatar = '<img class="inline_avatar" src="' . $bot_avatar . '" />';
-            $boardstats = str_replace($formatted_name, $bot_avatar.$formatted_name, $boardstats);
+            $boardstats = str_replace($formatted_name, '<span class="bauble inline">'.$bot_avatar.$formatted_name."</span>", $boardstats);
         }
     }
     
@@ -112,7 +116,7 @@ function index_polish()
     $replace = [];
     preg_match_all('/<!--\ss.+?onlineuser\s-->(.*?)<!--\se.*?onlineuser\s-->/', $boardstats, $matches);
     for ($i = 0; $i < count($matches[1]); $i++) {
-        $replace[] = format_user(trim(strip_tags($matches[1][$i])), 1, 'inline_avatar');
+        $replace[] = format_user(trim(strip_tags($matches[1][$i])), 1, 'inline');
     }
     $boardstats = preg_replace_callback('/<!--\ss.+?onlineuser\s-->(.*?)<!--\se.*?onlineuser\s-->/', function ($match) use (&$replace)
     {
@@ -120,7 +124,7 @@ function index_polish()
     }, $boardstats);
 }
 
-function format_user($data, $name = 0, $avatar = '')
+function format_user($data, $name = 0, $class = '', $avatar=1)
 {
     if (empty($data)) {
         return;
@@ -136,12 +140,12 @@ function format_user($data, $name = 0, $avatar = '')
         }
     }
     if (!empty($avatar)) {
-        $avatar = '<img class="' . $avatar . '" src="' . $user['avatar'] . '" />';
+        $avatar = '<img src="' . $user['avatar'] . '" alt="'. $data .'"/>';
     }
 
     $user = build_profile_link(format_name($avatar . htmlspecialchars_uni($user['username']), $user['usergroup'], $user['displaygroup']), $user['uid']);
 
-    return $user;
+    return '<span class="bauble '.$class.'">'.$user.'</span>';
 }
 
 function get_sid(array $spiders, string $name)
