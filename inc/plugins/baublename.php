@@ -32,9 +32,7 @@ function baublename_info()
 
 $plugins->add_hook('global_end', 'welcome_bauble');
 $plugins->add_hook('index_end', 'index_bauble');
-$settings = [
-    'wolbots'=>1
-];
+
 function baublename_activate()
 {
     global $db;
@@ -144,8 +142,9 @@ function format_user($data, $name = 0, $class = '', $avatar=1)
     }
 
     $user = build_profile_link(format_name($avatar . htmlspecialchars_uni($user['username']), $user['usergroup'], $user['displaygroup']), $user['uid']);
+    $class = !empty($class) ? "bauble ".$class : "bauble";
 
-    return '<span class="bauble '.$class.'">'.$user.'</span>';
+    return '<span class="'.$class.'">'.$user.'</span>';
 }
 
 function get_sid(array $spiders, string $name)
