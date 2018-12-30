@@ -1,16 +1,18 @@
 <?php
 
 /**
- * Bauble Name
- * 
+ * Bauble Name : Decorate your usernames with group color / avatar throughout your MyBB board.
+ *
  * @package MyBB Plugin
  * @author effone <effone@mybb.com>
  * @copyright 2018 MyBB Group <http://mybb.group>
  * @version 1.0.0
  * @license GPL-3.0
- * 
+ * @todo Preserve invisible asterisk in format_user function
+ *
  */
 
+// Disallow direct access to this file for security reasons
 if (!defined("IN_MYBB")) {
     die("Direct initialization of this file is not allowed.");
 }
@@ -24,12 +26,12 @@ function baublename_info()
         'author' => 'effone',
         'authorsite' => 'https://eff.one',
         'version' => '1.0.0',
-        'compatibility' => '18*',
+        'compatibility' => '18*'
     );
 }
 
-$plugins->add_hook('global_end', 'welcome_polish');
-$plugins->add_hook('index_end', 'index_polish');
+$plugins->add_hook('global_end', 'welcome_bauble');
+$plugins->add_hook('index_end', 'index_bauble');
 
 function baublename_activate()
 {
@@ -37,8 +39,10 @@ function baublename_activate()
     require_once MYBB_ROOT . "/inc/adminfunctions_templates.php";
     find_replace_templatesets('header_welcomeblock_member', '#{\$lang->welcome_back}#', '<!-- start: header_welcome_back -->{\$lang->welcome_back}<!-- end: header_welcome_back -->');
     find_replace_templatesets('index_stats', '#{\$lang->stats_newestuser}#', '<!-- start: index_newestuser -->{\$lang->stats_newestuser}<!-- end: index_newestuser -->');
+    find_replace_templatesets('index_whosonline_memberbit', '#'.preg_quote('{$user[\'profilelink\']}') .'#', '<!-- start: index_onlineuser -->{$user[\'profilelink\']}<!-- end: index_onlineuser -->');
 
-    $style = '.inline_avatar{height:16px; width:16px; display: inline-block; margin-right: 2px; margin-bottom: -2px; border-radius: 50%;}';
+    $style = '.bauble.inline{display: inline-block;}
+    .bauble.inline img{height:16px; width:16px; display: inline-block; margin-right: 5px; margin-bottom: -2px; border-radius: 50%;}';
     $stylesheet = array(
         "name" => "avatar.css",
         "tid" => 1,
@@ -59,7 +63,7 @@ function baublename_deactivate()
 {
     global $db;
     require_once MYBB_ROOT . "/inc/adminfunctions_templates.php";
-    $templates = array('header_welcomeblock_member', 'index_stats');
+    $templates = array('header_welcomeblock_member', 'index_stats', 'index_whosonline_memberbit');
     foreach ($templates as $template) {
         find_replace_templatesets($template, '#<!--(.*?)-->#', '');
     }
@@ -71,7 +75,7 @@ function baublename_deactivate()
     }
 }
 
-function welcome_polish()
+function welcome_bauble()
 {
     global $lang, $mybb, $header;
     if ((int) $mybb->user['uid']) {
@@ -80,14 +84,45 @@ function welcome_polish()
     }
 }
 
-function index_polish()
+function index_bauble()
 {
-    global $lang, $stats, $boardstats;
-    $lang->stats_newestuser = preg_replace('#(<a)[\s\S]+(<\/a>)#', format_user($stats['lastusername'], 1, 'inline_avatar'), $lang->stats_newestuser);
+    global $lang, $cache, $mybb, $stats, $boardstats, $onlinebots;
+    $lang->stats_newestuser = preg_replace('#(<a)[\s\S]+(<\/a>)#', format_user($stats['lastusername'], 1, 'inline'), $lang->stats_newestuser);
     $boardstats = preg_replace('#(<!-- start: index_newestuser)[\s\S]+(end: index_newestuser -->)#', $lang->stats_newestuser, $boardstats);
+
+    // Set online bot avatars
+    if(!empty($onlinebots))
+    {
+        $spavpath = $mybb->settings['avataruploadpath'];
+        if(my_substr($spavpath, 0, 1) == '.')
+        {
+            $spavpath = substr($spavpath, 2);
+        }
+        $spavpath .= "/spiders/";
+
+        $spiders = $cache->read('spiders');
+        foreach ($onlinebots as $formatted_name) {
+            $name = trim(strip_tags($formatted_name));
+            $bot_avatar = glob(MYBB_ROOT.$spavpath.get_sid($spiders, $name).'.*');
+            $bot_avatar = empty($bot_avatar) ? $mybb->settings['bburl'].'/'.$spavpath.'0.png' : str_replace(MYBB_ROOT, $mybb->settings['bburl'].'/', $bot_avatar[0]);
+            $bot_avatar = '<img class="inline_avatar" src="' . $bot_avatar . '" />';
+            $boardstats = str_replace($formatted_name, '<span class="bauble inline">'.$bot_avatar.$formatted_name."</span>", $boardstats);
+        }
+    }
+    
+    // Set online user avatars
+    $replace = [];
+    preg_match_all('/<!--\ss.+?onlineuser\s-->(.*?)<!--\se.*?onlineuser\s-->/', $boardstats, $matches);
+    for ($i = 0; $i < count($matches[1]); $i++) {
+        $replace[] = format_user(trim(strip_tags($matches[1][$i])), 1, 'inline');
+    }
+    $boardstats = preg_replace_callback('/<!--\ss.+?onlineuser\s-->(.*?)<!--\se.*?onlineuser\s-->/', function ($match) use (&$replace)
+    {
+        return array_shift($replace);
+    }, $boardstats);
 }
 
-function format_user($data, $name = 0, $avatar = '')
+function format_user($data, $name = 0, $class = '', $avatar=1)
 {
     if (empty($data)) {
         return;
@@ -103,10 +138,23 @@ function format_user($data, $name = 0, $avatar = '')
         }
     }
     if (!empty($avatar)) {
-        $avatar = '<img class="' . $avatar . '" src="' . $user['avatar'] . '" />';
+        $avatar = '<img src="' . $user['avatar'] . '" alt="'. $data .'"/>';
     }
 
     $user = build_profile_link(format_name($avatar . htmlspecialchars_uni($user['username']), $user['usergroup'], $user['displaygroup']), $user['uid']);
+    $class = !empty($class) ? "bauble ".$class : "bauble";
 
-    return $user;
+    return '<span class="'.$class.'">'.$user.'</span>';
+}
+
+function get_sid(array $spiders, string $name)
+{
+    foreach($spiders as $spider){
+        if($spider['name'] == $name)
+        {
+            return $spider['sid'];
+            break;
+        }
+    }
+    return 0;
 }
